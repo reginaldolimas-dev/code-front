@@ -11,7 +11,7 @@ export default function Home() {
     const [search, setSearch] = useState('')
 
     useEffect(() => {
-        fetch('/exercises.json')
+        fetch('/exercicios.json')
             .then(res => res.json())
             .then(data => {
                 setExercises(data)

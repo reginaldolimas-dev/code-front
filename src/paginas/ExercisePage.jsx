@@ -14,7 +14,7 @@ export default function ExercisePage() {
     const [running, setRunning] = useState(false)
 
     useEffect(() => {
-        fetch('/exercises.json')
+        fetch('/exercicios.json')
             .then(res => res.json())
             .then(data => {
                 const found = data.find(ex => ex.id === parseInt(id))
