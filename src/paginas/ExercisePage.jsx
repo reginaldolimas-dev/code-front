@@ -29,23 +29,58 @@ export default function ExercisePage() {
             })
     }, [id])
 
-    const handleRun = () => {
+    const handleRun = async () => {
         if (!code.trim()) return message.warning('Digite algum código antes de executar')
 
         setRunning(true)
         setOutput(null)
 
-        // 🔌 PLACEHOLDER: Substitua por chamada real ao Judge0/Backend
-        setTimeout(() => {
+        try {
+            const response = await fetch('http://localhost:8080/api/code/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    language: 'java',
+                    code: code,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            let outMessage = '';
+            let isSuccess = true;
+
+            if (result?.run){
+                outMessage = result.run?.stdout || "";
+                if (result.run?.code === 1) isSuccess = false;
+            } else {
+                outMessage = JSON.stringify(result, null, 2);
+            }
+
             setOutput({
-                success: true,
-                message: `✅ Compilação simulada!\nEntrada: ${exercise.inputExample}\nSaída esperada: ${exercise.expectedOutput}\n\n🔜 Integração com compilador real em breve.`,
-                testsPassed: exercise?.tests.length || 0,
-                totalTests: exercise?.tests.length || 0
+                success: isSuccess,
+                message: outMessage,
+                testsPassed: 0,
+                totalTests: exercise?.tests?.length || 0
             })
+            message.success('Execução concluída!')
+        } catch (error) {
+            setOutput({
+                success: false,
+                message: `Falha ao executar o código.\nErro: ${error.message}`,
+                testsPassed: 0,
+                totalTests: exercise?.tests?.length || 0
+            })
+            message.error('Erro na execução')
+        } finally {
             setRunning(false)
-            message.success('Código enviado para validação!')
-        }, 1200)
+        }
     }
 
     if (loading) return <Spin size="large" style={{ display: 'block', margin: '50px auto' }} />
@@ -106,7 +141,7 @@ export default function ExercisePage() {
 
                 {output && (
                     <Alert
-                        message={output.success ? `✅ ${output.testsPassed}/${output.totalTests} testes passaram` : '❌ Erro na execução'}
+                        message={output.success ? `Execução finalizada` : 'Erro na execução'}
                         description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'Consolas, monospace', fontSize: 13 }}>{output.message}</pre>}
                         type={output.success ? 'success' : 'error'}
                         showIcon
