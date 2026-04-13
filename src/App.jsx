@@ -1,30 +1,27 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import {Layout, Typography} from "antd";
-import Home from "./paginas/Home.jsx";
-import ExercisePage from "./paginas/ExercisePage.jsx";
-
-const { Header, Content, Footer } = Layout
-const { Title } = Typography
-
+import { BrowserRouter as Roteador, Routes as Rotas, Route as Rota } from 'react-router-dom';
+import Inicio from "./paginas/Home.jsx";
+import PaginaExercicio from "./paginas/ExercisePage.jsx";
+import { LayoutBase } from './componentes/core/LayoutBase.jsx';
+import { Titulo } from './componentes/core/Tipografia.jsx';
 
 function App() {
-
-  return (
-      <Router>
-        <Layout style={{ minHeight: '100vh' }}>
-          <Header style={{ background: '#001529', display: 'flex', alignItems: 'center' }}>
-            <Title level={4} style={{ color: '#fff', margin: 0 }}>🧠 Java Logic Trainer</Title>
-          </Header>
-          <Content style={{ padding: '24px', background: '#f5f5f5' }}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/exercise/:id" element={<ExercisePage />} />
-            </Routes>
-          </Content>
-          <Footer style={{ textAlign: 'center' }}>Java Logic Trainer ©2026</Footer>
-        </Layout>
-      </Router>
-  )
+    return (
+        <Roteador>
+            <LayoutBase
+                cabecalho={
+                    <Titulo nivel={4} estilo={{ color: '#fff', margin: 0 }}>
+                        🧠 Java Logic Trainer
+                    </Titulo>
+                }
+                rodape="Java Logic Trainer ©2026"
+            >
+                <Rotas>
+                    <Rota path="/" element={<Inicio />} />
+                    <Rota path="/exercise/:id" element={<PaginaExercicio />} />
+                </Rotas>
+            </LayoutBase>
+        </Roteador>
+    );
 }
 
-export default App
+export default App;

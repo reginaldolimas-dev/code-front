@@ -1,65 +1,77 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { List, Card, Tag, Spin, Input, Typography } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { SearchOutlined } from '@ant-design/icons';
+import { Cartao } from '../componentes/core/Cartao.jsx';
+import { Etiqueta } from '../componentes/core/Etiqueta.jsx';
+import { Carregamento } from '../componentes/core/Carregamento.jsx';
+import { EntradaTexto } from '../componentes/core/EntradaTexto.jsx';
+import { Texto } from '../componentes/core/Tipografia.jsx';
+import { Lista } from '../componentes/core/Lista.jsx';
+import { filtrarExercicios, obterCorDificuldade } from '../utils/exercicio.js';
+import _ from 'lodash';
 
-const { Text } = Typography
-
-export default function Home() {
-    const [exercises, setExercises] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [search, setSearch] = useState('')
+export default function Inicio() {
+    const [exercicios, definirExercicios] = useState([]);
+    const [carregando, definirCarregando] = useState(true);
+    const [busca, definirBusca] = useState('');
 
     useEffect(() => {
-        fetch('/exercicios.json')
-            .then(res => res.json())
-            .then(data => {
-                setExercises(data)
-                setLoading(false)
-            })
-    }, [])
+        const carregarExercicios = async () => {
+            try {
+                const resposta = await fetch('/exercicios.json');
+                const dados = await resposta.json();
+                definirExercicios(dados);
+            } catch (erro) {
+                console.error("Erro ao carregar exercícios:", erro);
+            } finally {
+                definirCarregando(false);
+            }
+        };
 
-    const filtered = exercises.filter(ex =>
-        ex.title.toLowerCase().includes(search.toLowerCase()) ||
-        ex.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-    )
+        carregarExercicios().catch(console.error);
+    }, []);
 
-    if (loading) return <Spin size="large" style={{ display: 'block', margin: '50px auto' }} />
+    const exerciciosFiltrados = filtrarExercicios(exercicios, busca);
+
+    if (carregando) {
+        return <Carregamento tamanho="large" estilo={{ display: 'block', margin: '50px auto' }} />;
+    }
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <Input
-                placeholder="Buscar por título ou tag (ex: for, lista, fácil)"
-                prefix={<SearchOutlined />}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ marginBottom: 24, maxWidth: 400 }}
+            <EntradaTexto
+                espacoReservado="Buscar por título ou tag (ex: for, lista, fácil)"
+                iconePrefixo={<SearchOutlined />}
+                valor={busca}
+                aoMudar={(e) => definirBusca(_.get(e, 'target.value', ''))}
+                estilo={{ marginBottom: 24, maxWidth: 400 }}
             />
-            <List
-                grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4, xl: 4 }}
-                dataSource={filtered}
-                renderItem={ex => (
-                    <List.Item>
-                        <Link to={`/exercise/${ex.id}`} style={{ width: '100%', textDecoration: 'none' }}>
-                            <Card hoverable>
-                                <Tag color={ex.difficulty === 'Fácil' ? 'green' : ex.difficulty === 'Médio' ? 'orange' : 'red'}>
-                                    {ex.difficulty}
-                                </Tag>
-                                <Card.Meta
-                                    title={ex.title}
-                                    description={
-                                        <div style={{ marginTop: 8 }}>
-                                            <Text type="secondary" style={{ fontSize: 12 }}>
-                                                {ex.tags.join(' • ')}
-                                            </Text>
-                                        </div>
-                                    }
-                                />
-                            </Card>
+            
+            <Lista
+                grade={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4, xl: 4 }}
+                fonteDados={exerciciosFiltrados}
+                renderizarItem={(ex) => (
+                    <div style={{ padding: 8 }}>
+                        <Link to={`/exercise/${_.get(ex, 'id')}`} style={{ width: '100%', textDecoration: 'none' }}>
+                            <Cartao 
+                                hoverable 
+                                titulo={_.get(ex, 'title')} 
+                                descricao={
+                                    <div style={{ marginTop: 8 }}>
+                                        <Texto tipo="secondary" estilo={{ fontSize: 12 }}>
+                                            {_.join(_.get(ex, 'tags', []), ' • ')}
+                                        </Texto>
+                                    </div>
+                                }
+                            >
+                                <Etiqueta cor={obterCorDificuldade(_.get(ex, 'difficulty'))} estilo={{ marginBottom: 8 }}>
+                                    {_.get(ex, 'difficulty')}
+                                </Etiqueta>
+                            </Cartao>
                         </Link>
-                    </List.Item>
+                    </div>
                 )}
             />
         </div>
-    )
+    );
 }

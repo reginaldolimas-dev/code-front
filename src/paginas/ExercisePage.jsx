@@ -1,90 +1,94 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Typography, Card, Tag, Button, Alert, Spin, message } from 'antd'
-import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons'
-import Editor from '@monaco-editor/react' // 🆕 Editor profissional
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { CodeEditor } from '../componentes/CodeEditor.jsx';
+import { Cartao } from '../componentes/core/Cartao.jsx';
+import { Titulo, Paragrafo, Texto } from '../componentes/core/Tipografia.jsx';
+import { Etiqueta } from '../componentes/core/Etiqueta.jsx';
+import { Botao } from '../componentes/core/Botao.jsx';
+import { Alerta } from '../componentes/core/Alerta.jsx';
+import { Carregamento } from '../componentes/core/Carregamento.jsx';
+import { Mensagem } from '../componentes/core/Mensagem.jsx';
+import { obterCorDificuldade, extrairResultadoExecucao } from '../utils/exercicio.js';
+import _ from 'lodash';
 
-const { Title, Paragraph, Text } = Typography
-
-export default function ExercisePage() {
-    const { id } = useParams()
-    const [exercise, setExercise] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [code, setCode] = useState('')
-    const [output, setOutput] = useState(null)
-    const [running, setRunning] = useState(false)
+export default function PaginaExercicio() {
+    const { id } = useParams();
+    const [exercicio, definirExercicio] = useState(null);
+    const [carregando, definirCarregando] = useState(true);
+    const [codigo, definirCodigo] = useState('');
+    const [resultadoSaida, definirResultadoSaida] = useState(null);
+    const [executando, definirExecutando] = useState(false);
 
     useEffect(() => {
-        fetch('/exercicios.json')
-            .then(res => res.json())
-            .then(data => {
-                const found = data.find(ex => ex.id === parseInt(id))
-                setExercise(found)
-                setCode(found?.starterCode || '')
-                setLoading(false)
-            })
-            .catch(() => {
-                setLoading(false)
-                message.error('Erro ao carregar exercícios')
-            })
-    }, [id])
+        const buscarExercicio = async () => {
+            try {
+                const resposta = await fetch('/exercicios.json');
+                const dados = await resposta.json();
+                
+                const encontrado = _.find(dados, (ex) => ex.id === _.toInteger(id));
+                definirExercicio(encontrado);
+                definirCodigo(_.get(encontrado, 'starterCode', ''));
+            } catch (erro) {
+                console.error("Erro ao carregar exercícios:", erro);
+                Mensagem.erro('Erro ao carregar exercícios');
+            } finally {
+                definirCarregando(false);
+            }
+        };
 
-    const handleRun = async () => {
-        if (!code.trim()) return message.warning('Digite algum código antes de executar')
+        buscarExercicio().catch(console.error);
+    }, [id]);
 
-        setRunning(true)
-        setOutput(null)
+    const lidarComExecucao = async () => {
+        if (_.isEmpty(_.trim(codigo))) {
+            return Mensagem.aviso('Digite algum código antes de executar');
+        }
+
+        definirExecutando(true);
+        definirResultadoSaida(null);
 
         try {
-            const response = await fetch('http://localhost:8080/api/code/execute', {
+            const resposta = await fetch('http://localhost:8080/api/code/execute', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     language: 'java',
-                    code: code,
+                    code: codigo,
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error(`Erro na API: ${response.status}`);
+            if (!resposta.ok) {
+                throw new Error(`Erro na API: ${resposta.status}`);
             }
 
-            const result = await response.json();
-
-            let outMessage = '';
-            let isSuccess = true;
-
-            if (result?.run){
-                outMessage = result.run?.stdout || "";
-                if (result.run?.code === 1) isSuccess = false;
-            } else {
-                outMessage = JSON.stringify(result, null, 2);
-            }
-
-            setOutput({
-                success: isSuccess,
-                message: outMessage,
-                testsPassed: 0,
-                totalTests: exercise?.tests?.length || 0
-            })
-            message.success('Execução concluída!')
-        } catch (error) {
-            setOutput({
-                success: false,
-                message: `Falha ao executar o código.\nErro: ${error.message}`,
-                testsPassed: 0,
-                totalTests: exercise?.tests?.length || 0
-            })
-            message.error('Erro na execução')
+            const resultadoJson = await resposta.json();
+            
+            const totalTestes = _.get(exercicio, 'tests.length', 0);
+            const dadosSaida = extrairResultadoExecucao(resultadoJson, totalTestes);
+            
+            definirResultadoSaida(dadosSaida);
+            Mensagem.sucesso('Execução concluída!');
+        } catch (erro) {
+            definirResultadoSaida({
+                sucesso: false,
+                mensagem: `Falha ao executar o código.\nErro: ${_.get(erro, 'message', 'Erro desconhecido')}`,
+                testesPassados: 0,
+                totalTestes: _.get(exercicio, 'tests.length', 0)
+            });
+            Mensagem.erro('Erro na execução');
         } finally {
-            setRunning(false)
+            definirExecutando(false);
         }
+    };
+
+    if (carregando) {
+        return <Carregamento tamanho="large" estilo={{ display: 'block', margin: '50px auto' }} />;
     }
 
-    if (loading) return <Spin size="large" style={{ display: 'block', margin: '50px auto' }} />
-    if (!exercise) return <Alert message="Exercício não encontrado" type="error" showIcon />
+    if (!exercicio) {
+        return <Alerta mensagem="Exercício não encontrado" tipo="error" />;
+    }
 
     return (
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px' }}>
@@ -92,63 +96,55 @@ export default function ExercisePage() {
                 <ArrowLeftOutlined /> Voltar para lista
             </Link>
 
-            <Card>
-                <Tag color={exercise.difficulty === 'Fácil' ? 'green' : exercise.difficulty === 'Médio' ? 'orange' : 'red'} style={{ marginBottom: 8 }}>
-                    {exercise.difficulty}
-                </Tag>
-                <Title level={3} style={{ marginTop: 0 }}>{exercise.title}</Title>
-                <Paragraph>{exercise.description}</Paragraph>
+            <Cartao>
+                <Etiqueta 
+                    cor={obterCorDificuldade(_.get(exercicio, 'difficulty'))} 
+                    estilo={{ marginBottom: 8 }}
+                >
+                    {_.get(exercicio, 'difficulty')}
+                </Etiqueta>
+                
+                <Titulo nivel={3} estilo={{ marginTop: 0 }}>{_.get(exercicio, 'title')}</Titulo>
+                <Paragrafo>{_.get(exercicio, 'description')}</Paragrafo>
 
                 <div style={{ background: '#f5f5f5', padding: 16, borderRadius: 8, marginBottom: 20, border: '1px solid #eee' }}>
-                    <Text strong>📥 Entrada de exemplo:</Text> <code style={{ marginLeft: 8 }}>{exercise.inputExample}</code><br/>
-                    <Text strong>📤 Saída esperada:</Text> <code style={{ marginLeft: 8 }}>{exercise.expectedOutput}</code>
+                    <Texto forte>📥 Entrada de exemplo:</Texto> <code style={{ marginLeft: 8 }}>{_.get(exercicio, 'inputExample')}</code><br/>
+                    <Texto forte>📤 Saída esperada:</Texto> <code style={{ marginLeft: 8 }}>{_.get(exercicio, 'expectedOutput')}</code>
                 </div>
 
-                <Title level={5} style={{ marginBottom: 8 }}>Seu Código</Title>
-                <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
-                    <Editor
-                        height="400px"
-                        defaultLanguage="java"
-                        theme="vs-dark"
-                        value={code}
-                        onChange={(value) => setCode(value ?? '')}
-                        options={{
-                            minimap: { enabled: false },
-                            fontSize: 14,
-                            scrollBeyondLastLine: false,
-                            automaticLayout: true,
-                            wordWrap: 'on',
-                            tabSize: 4,
-                            insertSpaces: true,
-                            bracketPairColorization: { enabled: true },
-                            formatOnPaste: true,
-                            formatOnType: true
-                        }}
-                        loading={
-                            <div style={{ padding: '20px', textAlign: 'center', background: '#1e1e1e', color: '#888' }}>
-                                <Spin tip="Carregando editor profissional..." />
-                            </div>
-                        }
-                    />
-                </div>
+                <Titulo nivel={5} estilo={{ marginBottom: 8 }}>Seu Código</Titulo>
+                
+                <CodeEditor codigo={codigo} aoMudar={definirCodigo} />
 
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleRun} loading={running} size="large">
+                    <Botao 
+                        tipo="primary" 
+                        icone={<PlayCircleOutlined />} 
+                        aoClicar={lidarComExecucao} 
+                        carregando={executando} 
+                        tamanho="large"
+                    >
                         Executar Código
-                    </Button>
-                    <Text type="secondary">💡 Dica: Cole apenas a classe/método solicitada. O sistema injetará os testes automaticamente.</Text>
+                    </Botao>
+                    <Texto tipo="secondary">
+                        💡 Dica: Cole apenas a classe/método solicitada. O sistema injetará os testes automaticamente.
+                    </Texto>
                 </div>
 
-                {output && (
-                    <Alert
-                        message={output.success ? `Execução finalizada` : 'Erro na execução'}
-                        description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'Consolas, monospace', fontSize: 13 }}>{output.message}</pre>}
-                        type={output.success ? 'success' : 'error'}
-                        showIcon
-                        style={{ marginTop: 16 }}
-                    />
+                {resultadoSaida && (
+                    <div style={{ marginTop: 16 }}>
+                        <Alerta
+                            mensagem={_.get(resultadoSaida, 'sucesso') ? `Execução finalizada` : 'Erro na execução'}
+                            descricao={
+                                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'Consolas, monospace', fontSize: 13 }}>
+                                    {_.get(resultadoSaida, 'mensagem')}
+                                </pre>
+                            }
+                            tipo={_.get(resultadoSaida, 'sucesso') ? 'success' : 'error'}
+                        />
+                    </div>
                 )}
-            </Card>
+            </Cartao>
         </div>
-    )
+    );
 }
